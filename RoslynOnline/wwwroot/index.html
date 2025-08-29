@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CompilerApp</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <base href="/" />
+    <link href="css/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="css/site.css" rel="stylesheet" />
+    <!-- If you add any scoped CSS files, uncomment the following to load them
+    <link href="CompilerApp.styles.css" rel="stylesheet" /> -->
+</head>
+
+<body>
+    <app>Loading...</app>
+
+    <script src="monaco-editor/min/vs/loader.js"></script>
+    <script>
+        var monacoInterop = {};
+        monacoInterop.editors = {};
+        monacoInterop.initialize = function initialize(elementId, initialCode, language) {
+            require.config({ paths: { 'vs': 'monaco-editor/min/vs' } });
+            require(['vs/editor/editor.main'], function initializeEditor() {
+                var editor = monaco.editor.create(document.getElementById(elementId), {
+                    value: initialCode,
+                    language: language
+                });
+                monacoInterop.editors[elementId] = editor;
+            });
+        }
+        monacoInterop.getCode = function getCode(elementId) {
+            return monacoInterop.editors[elementId].getValue();
+        }
+        monacoInterop.setCode = function setCode(elementId, code) {
+            monacoInterop.editors[elementId].setValue(code);
+        }
+        window.monacoInterop = monacoInterop;
+    </script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>
