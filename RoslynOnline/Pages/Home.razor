@@ -1,0 +1,171 @@
+﻿@page "/"
+@using System.Diagnostics
+@using System.Reflection
+@using System.Text
+@using LinqSharp
+
+<PageTitle>Home</PageTitle>
+
+<script>
+	async function hello() {
+		const output = await DotNet.invokeMethodAsync('RoslynOnline', 'RunCode', monacoInterop.getCode('code-panel'));
+		console.log(output);
+	}
+</script>
+
+<div style="width:100%">
+	<div id="@CodePanel" style="width:1024px;height:460px;border:1px solid grey"></div>
+	<div>
+		<button class="btn" @onclick="Run">Run</button>
+		<button class="btn" onclick="hello()"> Run (JSCall) </button>
+	</div>
+	<textarea @bind="Output"
+			  id="output"
+			  style="width:1024px"
+			  rows="10" cols="120"></textarea>
+</div>
+
+@code {
+	const string CodePanel = "code-panel";
+	const string DefaultLanguage = "csharp";
+
+	string Output = "";
+	const string DefaultCode = @"from c in Categories.Search(""Co"", c => new()
+{
+	c.CategoryName,
+
+	from p in c.Products
+	let s = p.SupplierLink
+	select new
+	{
+		p.ProductName,
+		s.CompanyName,
+	},
+})
+select new
+{
+	c.CategoryName,
+	c.Description,
+	c.CategoryID,
+	Products = string.Join(',',
+		from p in c.Products
+		where p.ProductName.Contains(""Co"")
+		select p.ProductName
+	),
+}";
+
+	[Inject] private HttpClient Client { get; set; }
+	[Inject] private Monaco Monaco { get; set; }
+
+	protected override Task OnInitializedAsync()
+	{
+		return Task.Run(() =>
+		{
+			Compiler.InitializeMetadataReferences(Client);
+		});
+	}
+
+	protected override Task OnAfterRenderAsync(bool firstRender)
+	{
+		return Task.Run(() =>
+		{
+			if (firstRender)
+			{
+				Monaco.Initialize(CodePanel, DefaultCode, DefaultLanguage);
+			}
+		});
+	}
+
+	public Task Run()
+	{
+		return Compiler.ReadyToRun((Func<Task>)(async () =>
+		{
+			Console.WriteLine("Compiling and Running code");
+			var finalCode = ComleteCode(Monaco.GetCode(CodePanel));
+			var result = await Home.RunCodeAsync(finalCode);
+			Output = result.Output;
+			Console.WriteLine((string)("Done in " + result.ElapsedMilliseconds + "ms"));
+		}));
+	}
+
+	public class RunResult
+	{
+		public string? Output { get; set; }
+		public long ElapsedMilliseconds { get; set; }
+	}
+
+	private static string ComleteCode(string code)
+	{
+		return $@"using System;
+using System.Linq;
+using LinqSharp;
+using Northwnd;
+
+var context = new NorthwndMemoryContext();
+var Categories = context.Categories;
+var exp = {code};
+Ink.Echo.Table(exp);
+";
+	}
+
+	[JSInvokable]
+	public static async Task<string> RunCode(string code)
+	{
+		var finalCode = ComleteCode(code);
+		var result = await RunCodeAsync(finalCode);
+		return result.Output ?? "";
+	}
+
+	public static async Task<RunResult> RunCodeAsync(string code)
+	{
+		var output = "";
+		var watch = new Stopwatch();
+
+		var currentOut = Console.Out;
+		using (var writer = new StringWriter())
+		{
+			Console.SetOut(writer);
+
+			Exception? exception = null;
+			try
+			{
+				watch.Start();
+				var (success, asm) = Compiler.LoadSource(code);
+				if (success)
+				{
+					var entry = asm.EntryPoint;
+					// sync wrapper over async Task Main
+					if (entry.Name == "<Main>")
+					{
+						// reflect for the async Task Main
+						entry = entry.DeclaringType.GetMethod("Main", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+					}
+					var hasArgs = entry.GetParameters().Length > 0;
+					var result = entry.Invoke(null, hasArgs ? new object[] { new string[0] } : null);
+					if (result is Task t)
+					{
+						await t;
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				exception = ex;
+			}
+
+			output += writer.ToString();
+			if (exception is not null)
+			{
+				output += "\r\n" + exception.ToString();
+			}
+			watch.Stop();
+		}
+		Console.SetOut(currentOut);
+
+		return new()
+		{
+			Output = output.ToString(),
+			ElapsedMilliseconds = watch.ElapsedMilliseconds,
+		};
+	}
+}

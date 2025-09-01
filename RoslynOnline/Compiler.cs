@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Immutable;
+using System.Net.Http.Json;
 using System.Reflection;
 
 namespace RoslynOnline
@@ -32,7 +33,7 @@ namespace RoslynOnline
             async Task InitializeInternal()
             {
                 var response = await client.GetFromJsonAsync<BlazorBoot>("_framework/blazor.boot.json");
-                var assemblies = await Task.WhenAll(response.resources.assembly.Keys.Select(x => client.GetAsync("_framework/_bin/" + x)));
+                var assemblies = await Task.WhenAll(response.resources.assembly.Keys.Select(x => client.GetAsync("_framework/" + x)));
 
                 var references = new List<MetadataReference>(assemblies.Length);
                 foreach (var asm in assemblies)
@@ -48,7 +49,7 @@ namespace RoslynOnline
             InitializationTask = InitializeInternal();
         }
 
-        public static Task WhenReady(Func<Task> action)
+        public static Task ReadyToRun(Func<Task> action)
         {
             if (InitializationTask.Status != TaskStatus.RanToCompletion)
             {
