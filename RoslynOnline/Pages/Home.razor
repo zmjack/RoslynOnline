@@ -63,6 +63,7 @@
         await Task.Run(() =>
         {
             Compiler.InitializeMetadataReferences(Client);
+            ReadHelloWorld();
         });
     }
 
@@ -116,6 +117,15 @@
         await Task.Run(() =>
         {
             Output = ComleteCode(Monaco.GetCode(CodePanel));
+        });
+    }
+
+    public async Task ReadHelloWorld()
+    {
+        await Client.GetAsync("snippet/HelloWorld.txt").ContinueWith(async (task) =>
+        {
+            var code = await task.Result.Content.ReadAsStringAsync();
+            Monaco.SetCode(CodePanel, code);
         });
     }
 
