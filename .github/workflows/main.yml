@@ -18,7 +18,11 @@ jobs:
         uses: actions/setup-dotnet@v1
         with:
           dotnet-version: "8.0.x"
-
+      
+      # install wasm-tool
+      - name: Install wasm-tool
+        run: dotnet workload restore
+      
       # publish Blazor project to the release folder
       - name: Publish .NET Project
         run: dotnet publish ${{ github.event.repository.name }}/${{ github.event.repository.name }}.csproj -c Release -o release --nologo
