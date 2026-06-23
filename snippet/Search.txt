@@ -1,0 +1,24 @@
+﻿// Search
+from c in Categories.Search("Co", c => new()
+{
+    c.CategoryName,
+
+    from p in c.Products
+    let s = p.SupplierLink
+    select new
+    {
+        p.ProductName,
+        s.CompanyName,
+    },
+})
+select new
+{
+    c.CategoryName,
+    c.Description,
+    c.CategoryID,
+    Products = string.Join(',',
+        from p in c.Products
+        where p.ProductName.Contains("Co")
+        select p.ProductName
+    ),
+}
