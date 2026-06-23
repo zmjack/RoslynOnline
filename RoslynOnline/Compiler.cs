@@ -49,21 +49,21 @@ namespace RoslynOnline
             InitializationTask = InitializeInternal();
         }
 
-        public static Task ReadyToRun(Func<Task> action)
+        public static async Task ReadyToRun(Func<Task> action)
         {
             if (InitializationTask.Status != TaskStatus.RanToCompletion)
             {
-                return InitializationTask.ContinueWith(x => action());
+                await InitializationTask.ContinueWith(x => action());
             }
             else
             {
-                return action();
+                await action();
             }
         }
 
         public static (bool success, Assembly asm) LoadSource(string source)
         {
-            var compilation = CSharpCompilation.Create("DynamicCode")
+            var compilation = CSharpCompilation.Create("Script")
                 .WithOptions(new CSharpCompilationOptions(OutputKind.ConsoleApplication))
                 .AddReferences(References)
                 .AddSyntaxTrees(CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview)));
@@ -96,7 +96,6 @@ namespace RoslynOnline
             using (var outputAssembly = new MemoryStream())
             {
                 compilation.Emit(outputAssembly);
-
                 return (true, Assembly.Load(outputAssembly.ToArray()));
             }
         }
